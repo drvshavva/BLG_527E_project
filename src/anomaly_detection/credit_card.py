@@ -180,10 +180,10 @@ class CreditCardFraudDetection:
 
             # 10 repetitions of 5-fold CV
             for repeat in range(10):
-                kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=repeat)
+                skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=repeat)
                 print(f"  Processing repeat {repeat}/10...")
 
-                for fold, (train_idx, test_idx) in enumerate(kf.split(X_subset)):
+                for fold, (train_idx, test_idx) in enumerate(skf.split(X_subset, self.y)):
                     X_train, X_test = X_subset.iloc[train_idx], X_subset.iloc[test_idx]
                     y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
 
