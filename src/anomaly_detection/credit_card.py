@@ -3,10 +3,9 @@ import pandas as pd
 import shap
 from matplotlib import pyplot as plt
 from scipy.stats import stats
-from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import precision_recall_curve, auc
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.svm import OneClassSVM
 from statsmodels.stats.multicomp import pairwise_tukeyhsd
@@ -104,14 +103,14 @@ class CreditCardFraudDetection:
         # A default of 100 samples are taken using the shap.sample function.
         print("Creating SHAP explainer...")
         # number of samples 100 (from paper)
-        background_data = shap.sample(self.X, 1000)
+        background_data = shap.sample(self.X, 100)
         explainer = shap.KernelExplainer(model.decision_function, background_data)
 
         # Step 4: Calculate SHAP values
         # The shap_values function of the KernelExplainer object is called.
         # This function returns a two-dimensional array of SHAP (feature importance) values for each sample.
         print("Calculating SHAP values...")
-        shap_sample = shap.sample(self.X, 100) # todo: bunu kaldırıp tüm sampleları versek mi? uzun sürer ama
+        shap_sample = shap.sample(self.X, 1000)  # todo: bunu kaldırıp tüm sampleları versek mi? uzun sürer ama
         shap_values = explainer.shap_values(shap_sample)
 
         # Step 5: Determine feature importance
@@ -181,7 +180,7 @@ class CreditCardFraudDetection:
 
             # 10 repetitions of 5-fold CV
             for repeat in range(10):
-                kf = KFold(n_splits=5, shuffle=True, random_state=repeat)
+                kf = StratifiedKFold(n_splits=5, shuffle=True, random_state=repeat)
                 print(f"  Processing repeat {repeat}/10...")
 
                 for fold, (train_idx, test_idx) in enumerate(kf.split(X_subset)):
@@ -206,8 +205,20 @@ class CreditCardFraudDetection:
                     # Create calibration data (using some normal + some anomaly samples)
                     # The output (decision scores) of the One-Class SVM and One-Class GMM models are subjected
                     # to sigmoid calibration to obtain the class probabilities required for the AUPRC metric.
+                    # We did these because there were very few anomalous samples and logistic regression gives an error because there are no anomalous samples.
                     cal_size = min(1000, len(X_train))
-                    cal_idx = np.random.choice(len(X_train), cal_size, replace=False)
+                    # Since we use StratifiedKFold, we should have both classes
+                    normal_indices = np.where(y_train == 0)[0]
+                    anomaly_indices = np.where(y_train == 1)[0]
+
+                    # Sample from both classes for calibration (maintain class balance)
+                    n_normal_cal = min(cal_size // 2, len(normal_indices))
+                    n_anomaly_cal = min(cal_size - n_normal_cal, len(anomaly_indices))
+
+                    selected_normal = np.random.choice(normal_indices, n_normal_cal, replace=False)
+                    selected_anomaly = np.random.choice(anomaly_indices, n_anomaly_cal, replace=False)
+
+                    cal_idx = np.concatenate([selected_normal, selected_anomaly])
                     X_cal, y_cal = X_train.iloc[cal_idx], y_train.iloc[cal_idx]
 
                     # Convert to binary classification format for calibration
@@ -236,7 +247,9 @@ class CreditCardFraudDetection:
                     # y_cal_binary: Real labels (0: normal, 1: anomaly)
                     # LogisticRegression(): Learns a sigmoid function and learns to convert decision_function values to probabilities.
                     cal_scores = calibrated_model.decision_function(X_cal).reshape(-1, 1)
-                    calibrator = LogisticRegression()
+                    calibrator = LogisticRegression(solver="lbfgs",
+                                                    class_weight="balanced",
+                                                    max_iter=1000)
                     calibrator.fit(cal_scores, y_cal_binary)
 
                     # Step 6: Calculate performance
