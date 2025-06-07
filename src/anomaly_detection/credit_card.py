@@ -110,7 +110,7 @@ class CreditCardFraudDetection:
         # The shap_values function of the KernelExplainer object is called.
         # This function returns a two-dimensional array of SHAP (feature importance) values for each sample.
         print("Calculating SHAP values...")
-        shap_sample = shap.sample(self.X, 1000)  # todo: bunu kaldırıp tüm sampleları versek mi? uzun sürer ama
+        shap_sample = shap.sample(self.X, 100)  # todo: bunu kaldırıp tüm sampleları versek mi? uzun sürer ama
         shap_values = explainer.shap_values(shap_sample)
 
         # Step 5: Determine feature importance
@@ -201,7 +201,7 @@ class CreditCardFraudDetection:
 
                     model.fit(X_train_normal)
 
-                    # Step 5: Probability calibration
+                    # Step 5: Probability calibration: todo bu adımı bu şekilde yaptım ama hiç emin değilim bir daha bir gözden geçirsek iyi olur
                     # Create calibration data (using some normal + some anomaly samples)
                     # The output (decision scores) of the One-Class SVM and One-Class GMM models are subjected
                     # to sigmoid calibration to obtain the class probabilities required for the AUPRC metric.
@@ -296,6 +296,7 @@ class CreditCardFraudDetection:
         The HSD test ranks the number of features into groups according to their effects on AUPRC scores.
 
         """
+        # todo: bu fonksiyonun gözden geçirilmesi lazım
         print(f"\n=== Statistical Analysis for {model_type.upper()} ===")
 
         if model_type not in self.results:
@@ -318,7 +319,7 @@ class CreditCardFraudDetection:
         print(f"\nANOVA Results:")
         print(f"F-statistic: {f_stat:.4f}")
         print(f"p-value: {p_value:.6f}")
-        print(f"Significant at α={alpha}: {'Yes' if p_value < alpha else 'No'}")
+        print(f"Significant at alpha={alpha}: {'Yes' if p_value < alpha else 'No'}")
 
         # Tukey's HSD test if ANOVA is significant
         if p_value < alpha:
