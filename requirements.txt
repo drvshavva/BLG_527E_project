@@ -1,0 +1,8 @@
+numpy~=2.0.1
+scikit-learn~=1.6.1
+pandas~=2.2.3
+shap~=0.47.2
+seaborn~=0.13.2
+matplotlib~=3.10.0
+scipy~=1.15.2
+statsmodels~=0.14.4

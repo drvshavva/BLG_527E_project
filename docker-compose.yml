@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  fraud-analysis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./dataset:/app/dataset:ro  # Mount dataset directory as read-only
+      - ./src:/app/src            # Mount source code
+    environment:
+      - PYTHONPATH=/app
+    restart: "no"  # Run once and stop
+    container_name: fraud-detection-analysis
+
+networks:
+  default:
+    name: fraud-analysis-network

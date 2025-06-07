@@ -78,5 +78,19 @@ detector.statistical_analysis('svm')
 ├── main.py # main file to run experiment
 ├── README.md
 ├── requirements.txt
+```
 
+### Running Code
+``` bash
+
+Option 1: Using Docker Compose 
+# Build and run the analysis
+docker-compose up --build
+
+Option 2: Local execution
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the analysis
+python main.py
 ```

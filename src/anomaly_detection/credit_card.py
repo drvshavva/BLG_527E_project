@@ -18,17 +18,13 @@ from src.models.one_class_gmm import OneClassGMM
 class CreditCardFraudDetection:
     """Main class for credit card fraud detection with SHAP feature selection"""
 
-    def __init__(self, random_state=42):
-        self.random_state = random_state
+    def __init__(self):
         self.data = None
         self.feature_names = None
         self.feature_importance_ranking = None
         self.results = {}
-        self.avg_results = {}
-        self.statistical_results = {}
-        self.dataset_info = {}
 
-    def load_and_prepare_data(self, file_path, nrows=None):
+    def load_and_prepare_data(self, file_path):
         """
         Load and prepare the credit card fraud dataset
         The Credit Card dataset is used. 29 features are used except for the "time" feature.
@@ -38,7 +34,7 @@ class CreditCardFraudDetection:
             print("Loading and preparing dataset...")
 
             # Load data
-            self.data = pd.read_csv(file_path, nrows=nrows)
+            self.data = pd.read_csv(file_path)
 
             # Remove 'Time' column and separate features from target
             if 'Time' in self.data.columns:
@@ -108,20 +104,20 @@ class CreditCardFraudDetection:
         # A default of 100 samples are taken using the shap.sample function.
         print("Creating SHAP explainer...")
         # number of samples 100 (from paper)
-        background_data = shap.sample(normal_data, 100)
+        background_data = shap.sample(self.X, 1000)
         explainer = shap.KernelExplainer(model.decision_function, background_data)
 
         # Step 4: Calculate SHAP values
         # The shap_values function of the KernelExplainer object is called.
         # This function returns a two-dimensional array of SHAP (feature importance) values for each sample.
         print("Calculating SHAP values...")
-        shap_sample = shap.sample(self.X, 100)
+        shap_sample = shap.sample(self.X, 100) # todo: bunu kaldırıp tüm sampleları versek mi? uzun sürer ama
         shap_values = explainer.shap_values(shap_sample)
 
         # Step 5: Determine feature importance
         # The feature importance value of each feature is found by averaging the absolute values of each row of the SHAP array (i.e. each sample).
         print("Determining feature importance...")
-        feature_importance = np.mean(np.abs(shap_values), axis=0)
+        feature_importance = np.abs(shap_values).mean(0)
 
         # Step 6: Rank features
         # he features are ranked according to their calculated average absolute SHAP values.
@@ -186,6 +182,7 @@ class CreditCardFraudDetection:
             # 10 repetitions of 5-fold CV
             for repeat in range(10):
                 kf = KFold(n_splits=5, shuffle=True, random_state=repeat)
+                print(f"  Processing repeat {repeat}/10...")
 
                 for fold, (train_idx, test_idx) in enumerate(kf.split(X_subset)):
                     X_train, X_test = X_subset.iloc[train_idx], X_subset.iloc[test_idx]
@@ -238,15 +235,15 @@ class CreditCardFraudDetection:
                     # cal_scores: Scores (decision_function output), rendered in 2D with .reshape(-1, 1) (LogisticRegression expects this).
                     # y_cal_binary: Real labels (0: normal, 1: anomaly)
                     # LogisticRegression(): Learns a sigmoid function and learns to convert decision_function values to probabilities.
-                    cal_scores = calibrated_model.decision_function(X_cal)
-                    calibrator = IsotonicRegression(out_of_bounds='clip')
+                    cal_scores = calibrated_model.decision_function(X_cal).reshape(-1, 1)
+                    calibrator = LogisticRegression()
                     calibrator.fit(cal_scores, y_cal_binary)
 
                     # Step 6: Calculate performance
                     # The performance of the model for each test fold is calculated and recorded using the
                     # Area Under the Precision Recall Curve (AUPRC) metric.
-                    test_scores = calibrated_model.decision_function(X_test)
-                    test_probs = calibrator.predict(test_scores)
+                    test_scores = calibrated_model.decision_function(X_test).reshape(-1, 1)
+                    test_probs = calibrator.predict_proba(test_scores)[:, 1]
 
                     # Calculate AUPRC
                     precision, recall, _ = precision_recall_curve(y_test, test_probs)

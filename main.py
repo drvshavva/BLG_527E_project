@@ -1,4 +1,4 @@
-from src.anomaly_detection.anomaly_detection import CreditCardFraudDetection
+from src.anomaly_detection.credit_card import CreditCardFraudDetection
 
 if __name__ == "__main__":
     # Initialize the detector
