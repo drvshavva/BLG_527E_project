@@ -5,9 +5,7 @@ from src.anomaly_detection.credit_card import CreditCardFraudDetection
 # svm: 'V1', 'V23', 'V25', 'V3', 'V18', 'V28', 'V2', 'V19', 'V21', 'V15', 'V5', 'V20', 'V4', 'V11', 'V16'
 if __name__ == "__main__":
     # Initialize the detector
-    detector = CreditCardFraudDetection(
-        _feature_importance_ranking=['V1', 'V23', 'V25', 'V3', 'V18', 'V28', 'V2', 'V19',
-                                     'V21', 'V15', 'V5', 'V20', 'V4', 'V11', 'V16'])
+    detector = CreditCardFraudDetection()
 
     # Run complete analysis
     # Replace 'creditcard.csv' with your dataset path
