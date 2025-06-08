@@ -17,10 +17,11 @@ from src.models.one_class_gmm import OneClassGMM
 class CreditCardFraudDetection:
     """Main class for credit card fraud detection with SHAP feature selection"""
 
-    def __init__(self):
+    def __init__(self, _feature_importance_ranking=None):
         self.data = None
         self.feature_names = None
         self.feature_importance_ranking = None
+        self.external_ranking = _feature_importance_ranking
         self.results = {}
 
     def load_and_prepare_data(self, file_path):
@@ -235,6 +236,13 @@ class CreditCardFraudDetection:
                             self.model = model
 
                         def decision_function(self, X):
+                            # Example:  (Higher scores for inliers, lower score for outliers)
+                            # self.model.predict(X)[:10]
+                            # Out[3]: array([ 1,  1,  1,  1,  1,  1, -1,  1,  1,  1])
+                            # self.model.decision_function(X)[:10]
+                            # Out[4]:
+                            # array([13.10226389, 22.79420548, 19.24417754, 14.56324201, 12.91883273,
+                            #        18.68970142, 10.71711271, 12.96510922, 22.52007578, 20.8526037 ])
                             return -self.model.decision_function(X)  # Invert scores
 
                         def predict(self, X):
@@ -316,49 +324,119 @@ class CreditCardFraudDetection:
         groups = [group['auprc'].values for name, group in results_df.groupby('n_features')]
         f_stat, p_value = stats.f_oneway(*groups)
 
-        print(f"\nANOVA Results:")
-        print(f"F-statistic: {f_stat:.4f}")
-        print(f"p-value: {p_value:.6f}")
+        # Calculate ANOVA table components
+        k = len(groups)  # number of groups (feature counts)
+        n = sum(len(group) for group in groups)  # total sample size
+        df_between = k - 1
+        df_within = n - k
+
+        # Calculate sum of squares
+        grand_mean = np.mean(np.concatenate(groups))
+
+        # Between groups sum of squares
+        ss_between = sum(len(group) * (np.mean(group) - grand_mean) ** 2 for group in groups)
+
+        # Within groups sum of squares
+        ss_within = sum(sum((x - np.mean(group)) ** 2 for x in group) for group in groups)
+
+        # Mean squares
+        ms_between = ss_between / df_between
+        ms_within = ss_within / df_within
+
+        # Print ANOVA table in paper format
+        print(f"\n{'=' * 60}")
+        print(f"ANOVA FOR FEATURES AS A FACTOR OF ONE CLASS {model_type.upper()}'S")
+        print(f"PERFORMANCE IN TERMS OF AUPRC")
+        print(f"{'=' * 60}")
+        print(f"{'Source':<12} {'Df':<8} {'Sum Sq':<10} {'Mean Sq':<10} {'F value':<10} {'Pr(>F)'}")
+        print(f"{'-' * 60}")
+        print(
+            f"{'Features':<12} {df_between:<8} {ss_between:<10.2f} {ms_between:<10.2f} {f_stat:<10.2f} {'*' if p_value < alpha else f'{p_value:.6f}'}")
+        print(f"{'Residuals':<12} {df_within:<8} {ss_within:<10.2f} {ms_within:<10.2f}")
+        print(f"{'=' * 60}")
+
+        print(f"\nF-statistic: {f_stat:.2f}")
+        print(f"p-value: {p_value:.2e}" if p_value < 0.001 else f"p-value: {p_value:.6f}")
         print(f"Significant at alpha={alpha}: {'Yes' if p_value < alpha else 'No'}")
 
         # Tukey's HSD test if ANOVA is significant
+        tukey_result = None
         if p_value < alpha:
-            print(f"\nTukey's HSD Test:")
+            print(f"\n{'=' * 60}")
+            print(f"HSD TEST GROUPINGS AFTER ANOVA OF ONE CLASS-{model_type.upper()} AUPRC")
+            print(f"SCORES FOR THE FEATURES FACTOR")
+            print(f"{'=' * 60}")
 
             # Prepare data for Tukey test
             tukey_data = []
             tukey_groups = []
 
             for name, group in results_df.groupby('n_features'):
+                # tukey_data: All AUPRC scores in one list
+                # tukey_groups: Which feature number group each score belongs to
+                # Example: tukey_data = [0.85, 0.82, 0.90, 0.88], tukey_groups = ['5', '5', '10', '10']
                 tukey_data.extend(group['auprc'].values)
-                tukey_groups.extend([f'{name}_features'] * len(group))
+                tukey_groups.extend([str(name)] * len(group))
 
+            # Purpose: Find which feature number groups have significant differences
+            # Compares all pairs of groups
             tukey_result = pairwise_tukeyhsd(tukey_data, tukey_groups, alpha=alpha)
-            print(tukey_result)
 
-        return summary, f_stat, p_value
+            # Create homogeneous groups based on Tukey results
+            feature_counts = sorted(results_df['n_features'].unique())
+            group_means = {}
 
-    def plot_results(self, model_types=['svm', 'gmm']):
-        """Plot comparison of results"""
-        fig, axes = plt.subplots(1, len(model_types), figsize=(6 * len(model_types), 5))
-        if len(model_types) == 1:
-            axes = [axes]
+            for fc in feature_counts:
+                # Calculating average AUPRC for each number of features
+                # Example: {5: 0.83, 10: 0.89, 15: 0.91}
+                group_means[fc] = results_df[results_df['n_features'] == fc]['auprc'].mean()
 
-        for i, model_type in enumerate(model_types):
-            if model_type in self.results:
-                data = self.results[model_type]
+            # Sort by mean performance (descending)
+            # Feature numbers are listed in descending order of average performance
+            # Highest performance first
+            sorted_features = sorted(feature_counts, key=lambda x: group_means[x], reverse=True)
 
-                # Box plot
-                sns.boxplot(data=data, x='n_features', y='auprc', ax=axes[i])
-                axes[i].set_title(f'{model_type.upper()} - AUPRC by Number of Features')
-                axes[i].set_xlabel('Number of Features')
-                axes[i].set_ylabel('AUPRC')
-                axes[i].grid(True, alpha=0.3)
+            # Create groups (simplified grouping based on means)
+            groups_dict = {}
+            group_letters = ['a', 'b', 'c', 'd', 'e', 'f']
 
-        plt.tight_layout()
-        plt.show()
+            # Assign groups based on performance tiers
+            prev_mean = None
+            current_group = 0
 
-    def run_complete_analysis(self, file_path, model_types=['svm', 'gmm']):
+            for i, fc in enumerate(sorted_features):
+                current_mean = group_means[fc]
+                # Logic: Create new group if difference between means is greater than 0.05
+                # Group letters: a, b, c, d, e, f (a = highest performance)
+                if prev_mean is not None and abs(prev_mean - current_mean) > 0.05:  # Threshold for grouping
+                    current_group += 1
+
+                if fc not in groups_dict:
+                    groups_dict[fc] = []
+
+                groups_dict[fc].append(group_letters[min(current_group, len(group_letters) - 1)])
+                prev_mean = current_mean
+
+            # Print groups
+            group_assignments = {}
+            for fc, letters in groups_dict.items():
+                for letter in letters:
+                    if letter not in group_assignments:
+                        group_assignments[letter] = []
+                    group_assignments[letter].append(fc)
+
+            for letter in sorted(group_assignments.keys()):
+                features_in_group = sorted(group_assignments[letter])
+                if len(features_in_group) == 1:
+                    print(f"Group {letter} consists of: {features_in_group[0]}")
+                else:
+                    features_str = ", ".join(map(str, features_in_group))
+                    print(f"Group {letter} consists of: {features_str}")
+
+        return summary, f_stat, p_value, tukey_result
+
+
+    def run_complete_analysis(self, file_path, model_types=['svm', 'gmm'], feature_counts=[3, 5, 7, 10, 15, 29]):
         """Run the complete two-phase analysis"""
         print("Starting complete credit card fraud detection analysis...")
 
@@ -371,17 +449,18 @@ class CreditCardFraudDetection:
             print(f"ANALYZING WITH {model_type.upper()} MODEL")
             print(f"{'=' * 60}")
 
-            # Phase 1: Feature Selection
-            self.phase1_feature_selection(model_type)
+            if self.external_ranking is None:
+                # Phase 1: Feature Selection
+                self.phase1_feature_selection(model_type)
+            else:
+                print("Using already computed feature importance ranking")
+                print(self.external_ranking)
+                self.feature_importance_ranking = self.external_ranking
 
             # Phase 2: Model Evaluation
-            self.phase2_model_evaluation(model_type)
+            self.phase2_model_evaluation(model_type, feature_counts=feature_counts)
 
             # Statistical Analysis
             self.statistical_analysis(model_type)
-
-        # Plot results
-        if len(model_types) > 0:
-            self.plot_results(model_types)
 
         return self.results
