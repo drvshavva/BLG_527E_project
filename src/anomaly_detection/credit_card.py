@@ -496,4 +496,4 @@ class CreditCardFraudDetection:
 
 
 det = CreditCardFraudDetection()
-det.run_complete_analysis(file_path="../../dataset/creditcard.csv", model_types=["gmm"])
+det.run_complete_analysis(file_path="../../dataset/creditcard.csv")
