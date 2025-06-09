@@ -112,7 +112,7 @@ class CreditCardFraudDetection:
         # This function returns a two-dimensional array of SHAP (feature importance) values for each sample.
         print("Calculating SHAP values...")
         shap_sample = shap.sample(self.X,
-                                  100)  # todo: bunu kaldırıp tüm sampleları versek mi? uzun sürer ama -> Benim 100 önrek için 19 dakika sürüyor, tüm samplelar için yapmak çok zor olur
+                                  100)
         shap_values = explainer.shap_values(shap_sample, random_state=1911)
 
         # Step 5: Determine feature importance
@@ -203,12 +203,7 @@ class CreditCardFraudDetection:
 
                     model.fit(X_train_normal)
 
-                    # Step 5: Probability calibration: todo bu adımı bu şekilde yaptım ama hiç emin değilim bir daha bir gözden geçirsek iyi olur -> Ben de baktım bir hata yok gibi,
-                    # İki sınıfa da ihtiyaç var ikisini de almışız,
-                    # makul 0-1 sayısı
-                    # modelin train edildiği verinin bir kısmı dönüştürüldü (burada da hata yok sanırım)
-                    # logistic reg için ters sonuçlar aldık
-                    # 1 olma olasılıklarını aldık
+                    # Step 5: Probability calibration:
 
                     # Create calibration data (using some normal + some anomaly samples)
                     # The output (decision scores) of the One-Class SVM and One-Class GMM models are subjected
@@ -311,19 +306,7 @@ class CreditCardFraudDetection:
         The HSD test ranks the number of features into groups according to their effects on AUPRC scores.
 
         """
-        # todo: bu fonksiyonun gözden geçirilmesi lazım -> Tukeytsd hesaplamasını değiştirdim. Sadece meandiffe değil başka birkaç parametreye de bakılıyordu
-        # ANOVA hesaplaması doğru
-        """
-        from statsmodels.formula.api import ols
-        from statsmodels.stats.anova import anova_lm
 
-        model = ols('auprc ~ C(n_features)', data=results_df).fit()
-        anova_table = anova_lm(model, typ=2)
-        """
-        # ile kontrol edildi.
-
-        # https://real-statistics.com/one-way-analysis-of-variance-anova/unplanned-comparisons/tukey-hsd/
-        # https://real-statistics.com/statistics-tables/studentized-range-q-table/
         print(f"\n=== Statistical Analysis for {model_type.upper()} ===")
 
         if model_type not in self.results:
@@ -493,7 +476,3 @@ class CreditCardFraudDetection:
             self.statistical_analysis(model_type)
 
         return self.results
-
-
-det = CreditCardFraudDetection()
-det.run_complete_analysis(file_path="../../dataset/creditcard.csv")
