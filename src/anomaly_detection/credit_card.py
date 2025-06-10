@@ -111,7 +111,7 @@ class CreditCardFraudDetection:
         # The shap_values function of the KernelExplainer object is called.
         # This function returns a two-dimensional array of SHAP (feature importance) values for each sample.
         print("Calculating SHAP values...")
-        shap_sample = shap.sample(self.X, 100)  # todo: bunu kaldırıp tüm sampleları versek mi? uzun sürer ama
+        shap_sample = shap.sample(self.X, 100)
         shap_values = explainer.shap_values(shap_sample)
 
         # Step 5: Determine feature importance
@@ -202,7 +202,8 @@ class CreditCardFraudDetection:
 
                     model.fit(X_train_normal)
 
-                    # Step 5: Probability calibration: todo bu adımı bu şekilde yaptım ama hiç emin değilim bir daha bir gözden geçirsek iyi olur
+                    # Step 5: Probability calibration:
+
                     # Create calibration data (using some normal + some anomaly samples)
                     # The output (decision scores) of the One-Class SVM and One-Class GMM models are subjected
                     # to sigmoid calibration to obtain the class probabilities required for the AUPRC metric.
@@ -304,7 +305,7 @@ class CreditCardFraudDetection:
         The HSD test ranks the number of features into groups according to their effects on AUPRC scores.
 
         """
-        # todo: bu fonksiyonun gözden geçirilmesi lazım
+
         print(f"\n=== Statistical Analysis for {model_type.upper()} ===")
 
         if model_type not in self.results:
@@ -434,7 +435,6 @@ class CreditCardFraudDetection:
                     print(f"Group {letter} consists of: {features_str}")
 
         return summary, f_stat, p_value, tukey_result
-
 
     def run_complete_analysis(self, file_path, model_types=['svm', 'gmm'], feature_counts=[3, 5, 7, 10, 15, 29]):
         """Run the complete two-phase analysis"""
